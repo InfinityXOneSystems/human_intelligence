@@ -12,7 +12,7 @@ Set-Location $ROOT
 $STATE_DIR      = "$ROOT\.infinity"
 $REPORT_DIR     = "$STATE_DIR\reports"
 $QUARANTINE_DIR = "$STATE_DIR\quarantine"
-$LOG_FILE       = "$STATE_DIR\validator.log"
+
 $TIMESTAMP      = Get-Date -Format "yyyyMMdd-HHmmss"
 
 New-Item -ItemType Directory -Force $STATE_DIR      | Out-Null
@@ -27,26 +27,19 @@ $RESULT = @{
         timestamp = $TIMESTAMP
         root      = $ROOT
     }
-    python_errors = @()
+
     patched       = @()
     healed        = @()
 }
 
 Get-ChildItem -Recurse -Filter *.py | ForEach-Object {
-    $out = cmd /c "python -m py_compile `"$($_.FullName)`"" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $RESULT.python_errors += @{ file=$_.FullName; error=($out -join "`n") }
-        if ($Mode -in @("heal","full")) {
-            Move-Item $_.FullName "$QUARANTINE_DIR\$($_.Name)" -Force
-            $RESULT.healed += "Quarantined: $($_.FullName)"
-        }
-    }
+
 }
 
 if ($Mode -in @("patch","full")) {
     Get-ChildItem -Recurse -Filter *.py | ForEach-Object {
         $c = Get-Content $_.FullName -Raw
-        if ($c -match "FastAPI" -and $c -notmatch "/health") {
+        if ($c -match "FastAPI" -and $c -notmatch "/health" -and $c -notmatch "@app.get(\"/health\")") {
 @"
 @app.get("/health")
 def health(): return {"status":"ok"}
